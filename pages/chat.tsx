@@ -29,7 +29,7 @@ const SocketComponent = () => {
 
     return () => {
       if (socket) {
-        socket.disconnect(); // Disconnect socket when component unmounts
+        socket.disconnect();
         socket = null;
       }
     };
