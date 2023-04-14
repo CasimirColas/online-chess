@@ -1,0 +1,13 @@
+.main {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid black;
+}
+
+.main p {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+}

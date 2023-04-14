@@ -1,0 +1,8 @@
+.board {
+  width: 40vw;
+  height: 40vw;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  border: solid 1px black;
+}
