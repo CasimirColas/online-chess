@@ -6,29 +6,17 @@ interface Props {
   number: number;
   movableSquares: number[];
   takableSquares: number[];
-  moveStart: number;
-  moveEnd: number;
   assignedPiece: string;
   color: boolean;
   pieceAction: () => void;
   makeAmove: (pos1: number, pos2: number) => void;
   deSelect: () => void;
-  dangerSquares: number[];
 }
 
 function Square(props: Props) {
   function squareColor() {
-    if (props.dangerSquares.includes(props.number)) {
-      return "orange";
-    }
     if (props.takableSquares.includes(props.number)) {
       return "lightgray";
-    }
-    if (props.number === props.moveStart) {
-      return "darkgoldenrod";
-    }
-    if (props.number === props.moveEnd) {
-      return "yellow";
     }
     if (props.color) {
       return "beige";

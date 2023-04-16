@@ -3,12 +3,12 @@ import styles from "@/styles/Home.module.css";
 import ChessBoard from "@/components/chess/Board";
 import { useState, useEffect } from "react";
 import {
-  dangerArea,
-  getBlacks,
-  getWhites,
   createCustomBoard,
-  gameStatus,
+  defaultSpecial,
+  initialBoard,
   playerInfo,
+  makeAmove,
+  gameInfo,
 } from "@/components/chess/functions";
 
 export default function Home() {
@@ -16,87 +16,40 @@ export default function Home() {
     const moveSound = new Audio("chess/sounds/move.mp3");
     moveSound.play();
   }
-
-  const initialBoard = [
-    "rook_black",
-    "knight_black",
-    "bishop_black",
-    "queen_black",
-    "king_black",
-    "bishop_black",
-    "knight_black",
-    "rook_black",
-  ]
-    .concat(Array(8).fill("pawn_black"))
-    .concat(Array(32).fill(""))
-    .concat(Array(8).fill("pawn_white"))
-    .concat([
-      "rook_white",
-      "knight_white",
-      "bishop_white",
-      "queen_white",
-      "king_white",
-      "bishop_white",
-      "knight_white",
-      "rook_white",
-    ]);
-
-  const [gameBoard, setGameBoard] = useState(
-    createCustomBoard([
-      { p: "king_white", pos: 60 },
-      { p: "king_black", pos: 42 },
-      { p: "rook_black", pos: 48 },
-      { p: "rook_black", pos: 47 },
-    ])
+  const [game, setGame] = useState<gameInfo>(
+    playerInfo(true, initialBoard, defaultSpecial)
+    // createCustomBoard([
+    //   { p: "king_white", pos: 60 },
+    //   { p: "king_black", pos: 42 },
+    //   { p: "rook_black", pos: 48 },
+    //   { p: "rook_black", pos: 47 },
+    // ])
   );
-  const [status, setStatus] = useState<{
-    where2go: number[];
-    checked: boolean;
-  }>();
-  const [lastMoveStart, setLastMoveStart] = useState(-1);
-  const [lastMoveEnd, setLastMoveEnd] = useState(-1);
-  const [whiteIsPlaying, setwhiteIsPlaying] = useState(true);
-  const [dangerSquares, setDangerSquares] = useState(
-    dangerArea(
-      whiteIsPlaying,
-      gameBoard,
-      getWhites(gameBoard),
-      getBlacks(gameBoard)
-    )
-  );
+  const [wishedPiece, setwishedPiece] = useState("queen");
+  const [turnCounter, setTurnCounter] = useState(0);
 
-  function makeAmove(pos1: number, pos2: number) {
-    //setLastMoveStart(pos1);
-    //setLastMoveEnd(pos2);
-    let game = [...gameBoard];
-    game[pos2] = game[pos1];
-    game[pos1] = "";
-    setGameBoard(game);
-    setwhiteIsPlaying(!whiteIsPlaying);
-    setDangerSquares(
-      dangerArea(!whiteIsPlaying, game, getWhites(game), getBlacks(game))
-    );
+  function movePice(pos1: number, pos2: number) {
+    setGame(makeAmove(pos1, pos2, game, wishedPiece));
     playAudio();
   }
 
   function finalMessage() {
-    if (status?.where2go.length === 0 && status.checked) {
-      return `Checkmate ${whiteIsPlaying ? "Black won" : "White won"}`;
+    if (!game.canPlay && game?.check) {
+      return `Checkmate ${game.playerIsWhite ? "Black won" : "White won"}`;
     }
-    if (status?.where2go.length === 0) {
+    if (!game.canPlay) {
       return "Draw";
     }
-    if (status?.checked) {
+    if (game.check) {
       return "Check";
     }
     return "You can play";
   }
-
   useEffect(() => {
-    setStatus(gameStatus(whiteIsPlaying, gameBoard, dangerSquares, true));
-    console.log(playerInfo(whiteIsPlaying, gameBoard));
-  }, [gameBoard]);
+    console.log(game);
 
+    setTurnCounter(turnCounter + 1);
+  }, [game]);
   return (
     <>
       <Head>
@@ -107,32 +60,21 @@ export default function Home() {
       </Head>
       <main className={styles.main}>
         <h1>
-          It's {whiteIsPlaying ? "white's" : "black's"} turn to make a move
+          It's {game.playerIsWhite ? "white's" : "black's"} turn to make a move
         </h1>
+        <h2>Turn number: {turnCounter}</h2>
         <ChessBoard
-          board={gameBoard}
-          whitePieces={getWhites(gameBoard)}
-          blackPieces={getBlacks(gameBoard)}
-          lastMoveStart={lastMoveStart}
-          lastMoveEnd={lastMoveEnd}
-          makeAmove={makeAmove}
-          whiteIsPlaying={whiteIsPlaying}
-          dangerSquares={dangerSquares}
+          board={game.board}
+          makeAmove={movePice}
+          pieceMoves={game.pieceMoves}
+          ennemyPos={game.ennemyPos}
         />
         <h1>{finalMessage()}</h1>
-        {status?.where2go.length === 0 ? (
+        {!game.canPlay ? (
           <button
             onClick={() => {
-              setGameBoard(initialBoard);
-              setwhiteIsPlaying(true);
-              setDangerSquares(
-                dangerArea(
-                  whiteIsPlaying,
-                  initialBoard,
-                  getWhites(initialBoard),
-                  getBlacks(initialBoard)
-                )
-              );
+              setGame(playerInfo(true, initialBoard, defaultSpecial));
+              setTurnCounter(0);
             }}
           >
             Restart

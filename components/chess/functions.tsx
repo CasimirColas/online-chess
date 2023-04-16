@@ -1,3 +1,62 @@
+//Interfaces
+export interface gameInfo {
+  playerIsWhite: boolean;
+  check: boolean;
+  canPlay: boolean;
+  ennemyPos: number[];
+  pieceMoves: { name: string; pos: number; moves: number[] }[];
+  board: string[];
+  whiteCastle: {
+    kingMoved: boolean;
+    rookRMoved: boolean;
+    rookLMoved: boolean;
+  };
+  blackCastle: {
+    kingMoved: boolean;
+    rookRMoved: boolean;
+    rookLMoved: boolean;
+  };
+
+  jumpPawn: number | null;
+}
+//Default Values
+export const defaultSpecial = {
+  whiteCastle: {
+    kingMoved: false,
+    rookRMoved: false,
+    rookLMoved: false,
+  },
+  blackCastle: {
+    kingMoved: false,
+    rookRMoved: false,
+    rookLMoved: false,
+  },
+
+  jumpPawn: null,
+};
+export const initialBoard = [
+  "rook_black",
+  "knight_black",
+  "bishop_black",
+  "queen_black",
+  "king_black",
+  "bishop_black",
+  "knight_black",
+  "rook_black",
+]
+  .concat(Array(8).fill("pawn_black"))
+  .concat(Array(32).fill(""))
+  .concat(Array(8).fill("pawn_white"))
+  .concat([
+    "rook_white",
+    "knight_white",
+    "bishop_white",
+    "queen_white",
+    "king_white",
+    "bishop_white",
+    "knight_white",
+    "rook_white",
+  ]);
 //Utility
 export function kingPlace(isWhite: boolean, board: string[]) {
   return board.indexOf(`king_${isWhite ? "white" : "black"}`);
@@ -19,6 +78,12 @@ export function getBlacks(arr: string[]) {
     }
   }
   return pieces;
+}
+export function getX(pos: number) {
+  return pos % 8;
+}
+export function getY(pos: number) {
+  return (pos - (pos % 8)) / 8;
 }
 export function getXY(pos: number) {
   return { x: pos % 8, y: (pos - (pos % 8)) / 8 };
@@ -149,7 +214,16 @@ export function queenMoves(coord: { x: number; y: number }, pieces: number[]) {
   return rookMoves(coord, pieces).concat(bishopMoves(coord, pieces));
 }
 
-export function kingMoves(coord: { x: number; y: number }, danger: number[]) {
+export function kingMoves(
+  coord: { x: number; y: number },
+  danger: number[],
+  castle: { kingMoved: boolean; rookRMoved: boolean; rookLMoved: boolean },
+  leftLineIsEmpty: boolean,
+  rightLineIsEmpty: boolean,
+  dangerL: boolean,
+  dangerR: boolean,
+  check: boolean
+) {
   const blocks = danger.map((e) => getXY(e));
   const moves = [
     { x: coord.x, y: coord.y + 1 },
@@ -161,13 +235,22 @@ export function kingMoves(coord: { x: number; y: number }, danger: number[]) {
     { x: coord.x + 1, y: coord.y - 1 },
     { x: coord.x - 1, y: coord.y + 1 },
   ];
+  if (!castle.kingMoved && !check) {
+    if (!castle.rookLMoved && leftLineIsEmpty && !dangerL) {
+      moves.push({ x: coord.x - 2, y: coord.y });
+    }
+    if (!castle.rookRMoved && rightLineIsEmpty && !dangerR) {
+      moves.push({ x: coord.x + 2, y: coord.y });
+    }
+  }
   return moves.filter((e) => !blocks.some((f) => f.x === e.x && f.y === e.y));
 }
 export function pawnMoves(
   coord: { x: number; y: number },
   isWhite: boolean,
   whitePieces: number[],
-  blackPieces: number[]
+  blackPieces: number[],
+  jumpPawn: number | null
 ) {
   const moves: { x: number; y: number }[] = [];
   const ennemySquares = isWhite
@@ -216,7 +299,13 @@ export function pawnMoves(
   ) {
     moves.push({ x: coord.x + 1, y: coord.y + forwardDirection });
   }
-
+  //Can he eat en passant
+  if (
+    jumpPawn &&
+    (getX(jumpPawn) + 1 === coord.x || getX(jumpPawn) - 1 === coord.x)
+  ) {
+    moves.push({ x: getX(jumpPawn), y: getY(jumpPawn) + forwardDirection });
+  }
   return moves;
 }
 //Gameplay
@@ -226,9 +315,7 @@ export function dangerArea(
   whitePieces: number[],
   blackPieces: number[]
 ) {
-  const allPieces = whitePieces
-    .concat(blackPieces)
-    .filter((e) => e !== kingPlace(isWhite, board));
+  const allPieces = whitePieces.concat(blackPieces);
   const ennemies = isWhite ? blackPieces : whitePieces;
   let dangerSquares: { x: number; y: number }[] = [];
 
@@ -294,92 +381,8 @@ export function willThereBeDanger(
   game[pos1] = "";
   const kingPos = kingPlace(isWhite, game);
   const deadKing = dangerArea(isWhite, game, getWhites(game), getBlacks(game));
-  console.log(deadKing);
 
   return deadKing.includes(kingPos);
-}
-export function gameStatus(
-  isWhite: boolean,
-  board: string[],
-  dangerSquares: number[],
-  fast: boolean
-) {
-  const allies = isWhite ? getWhites(board) : getBlacks(board);
-  const whitePieces = getWhites(board);
-  const blackPieces = getBlacks(board);
-  const checked = dangerSquares.includes(kingPlace(isWhite, board));
-  let availableMoves: number[] = [];
-
-  for (let i = 0; i < allies.length; i++) {
-    if (fast && availableMoves.length > 0) break;
-    if (board[allies[i]] === `knight_${isWhite ? "white" : "black"}`) {
-      availableMoves = availableMoves.concat(
-        noTeamKill(
-          getPlaces(boundMoves(knightMoves(getXY(allies[i])))).filter(
-            (e) => !willThereBeDanger(isWhite, board, allies[i], e)
-          ),
-          allies
-        )
-      );
-    }
-    if (board[allies[i]] === `bishop_${isWhite ? "white" : "black"}`) {
-      availableMoves = availableMoves.concat(
-        noTeamKill(
-          getPlaces(
-            boundMoves(
-              bishopMoves(getXY(allies[i]), whitePieces.concat(blackPieces))
-            )
-          ).filter((e) => !willThereBeDanger(isWhite, board, allies[i], e)),
-          allies
-        )
-      );
-    }
-    if (board[allies[i]] === `rook_${isWhite ? "white" : "black"}`) {
-      availableMoves = availableMoves.concat(
-        noTeamKill(
-          getPlaces(
-            boundMoves(
-              rookMoves(getXY(allies[i]), whitePieces.concat(blackPieces))
-            )
-          ).filter((e) => !willThereBeDanger(isWhite, board, allies[i], e)),
-          allies
-        )
-      );
-    }
-    if (board[allies[i]] === `queen_${isWhite ? "white" : "black"}`) {
-      availableMoves = availableMoves.concat(
-        noTeamKill(
-          getPlaces(
-            boundMoves(
-              queenMoves(getXY(allies[i]), whitePieces.concat(blackPieces))
-            )
-          ),
-          allies
-        )
-      );
-    }
-    if (board[allies[i]] === `king_${isWhite ? "white" : "black"}`) {
-      availableMoves = availableMoves.concat(
-        noTeamKill(
-          getPlaces(boundMoves(kingMoves(getXY(allies[i]), dangerSquares))),
-          allies
-        )
-      );
-    }
-    if (board[allies[i]] === `pawn_${isWhite ? "white" : "black"}`) {
-      availableMoves = availableMoves.concat(
-        noTeamKill(
-          getPlaces(
-            boundMoves(
-              pawnMoves(getXY(allies[i]), isWhite, whitePieces, blackPieces)
-            )
-          ).filter((e) => !willThereBeDanger(isWhite, board, allies[i], e)),
-          allies
-        )
-      );
-    }
-  }
-  return { where2go: availableMoves, checked: checked };
 }
 //Playground
 export function createCustomBoard(pieces: { p: string; pos: number }[]) {
@@ -390,94 +393,170 @@ export function createCustomBoard(pieces: { p: string; pos: number }[]) {
   return game;
 }
 //Server side
-export function playerInfo(playerIsWhite: boolean, board: string[]) {
-  const legacyBoard = board;
-  const blacks = getBlacks(legacyBoard);
-  const whites = getWhites(legacyBoard);
-  const allPieces = blacks.concat(whites);
-  const dangerSquares = dangerArea(playerIsWhite, legacyBoard, whites, blacks);
-  const allies = playerIsWhite ? whites : blacks;
+export function playerInfo(
+  playerIsWhite: boolean,
+  board: string[],
+  special: {
+    whiteCastle: {
+      kingMoved: boolean;
+      rookRMoved: boolean;
+      rookLMoved: boolean;
+    };
+    blackCastle: {
+      kingMoved: boolean;
+      rookRMoved: boolean;
+      rookLMoved: boolean;
+    };
 
-  const newBoard: { piece: string; pos: number; moves: number[] }[] = [];
+    jumpPawn: number | null;
+  }
+): gameInfo {
+  const blacks = getBlacks(board);
+  const whites = getWhites(board);
+  const allPieces = blacks.concat(whites);
+  const dangerSquares = dangerArea(playerIsWhite, board, whites, blacks);
+  const allies = playerIsWhite ? whites : blacks;
+  const castle = playerIsWhite ? special.whiteCastle : special.blackCastle;
+
+  const check = dangerSquares.includes(
+    board.findIndex((e) => e === `king_${playerIsWhite ? "white" : "black"}`)
+  );
+
+  //Castle possibility checking
+  let leftLineIsEmpty = true;
+  let rightLineIsEmpty = true;
+  let dangerL = false;
+  let dangerR = false;
+
+  const emptyLlinecheck = playerIsWhite ? [57, 58, 59] : [1, 2, 3];
+  const emptyRlinecheck = playerIsWhite ? [61, 62] : [5, 6];
+  const dangerLcheck = playerIsWhite ? [58, 59] : [2, 3];
+  const dangerRcheck = playerIsWhite ? [61, 62] : [5, 6];
+
+  for (let i = 0; i < emptyLlinecheck.length; i++) {
+    if (board[emptyLlinecheck[i]] !== "") {
+      leftLineIsEmpty = false;
+      break;
+    }
+  }
+  for (let i = 0; i < emptyRlinecheck.length; i++) {
+    if (board[emptyRlinecheck[i]] !== "") {
+      rightLineIsEmpty = false;
+      break;
+    }
+  }
+  for (let i = 0; i < dangerLcheck.length; i++) {
+    if (dangerSquares.includes(dangerLcheck[i])) {
+      dangerL = true;
+      break;
+    }
+  }
+  for (let i = 0; i < dangerRcheck.length; i++) {
+    if (dangerSquares.includes(dangerLcheck[i])) {
+      dangerR = true;
+      break;
+    }
+  }
+
+  const pieceMoves: { name: string; pos: number; moves: number[] }[] = [];
 
   for (let i = 0; i < board.length; i++) {
     if (board[i] === `knight_${playerIsWhite ? "white" : "black"}`) {
-      newBoard.push({
-        piece: board[i],
+      pieceMoves.push({
+        name: board[i],
         pos: i,
         moves: noTeamKill(
           getPlaces(boundMoves(knightMoves(getXY(i)))).filter(
-            (e) => !willThereBeDanger(playerIsWhite, legacyBoard, i, e)
+            (e) => !willThereBeDanger(playerIsWhite, board, i, e)
           ),
           allies
         ),
       });
     }
     if (board[i] === `bishop_${playerIsWhite ? "white" : "black"}`) {
-      newBoard.push({
-        piece: board[i],
+      pieceMoves.push({
+        name: board[i],
         pos: i,
         moves: noTeamKill(
           getPlaces(boundMoves(bishopMoves(getXY(i), allPieces))).filter(
-            (e) => !willThereBeDanger(playerIsWhite, legacyBoard, i, e)
+            (e) => !willThereBeDanger(playerIsWhite, board, i, e)
           ),
           allies
         ),
       });
     }
     if (board[i] === `rook_${playerIsWhite ? "white" : "black"}`) {
-      newBoard.push({
-        piece: board[i],
+      pieceMoves.push({
+        name: board[i],
         pos: i,
         moves: noTeamKill(
           getPlaces(boundMoves(rookMoves(getXY(i), allPieces))).filter(
-            (e) => !willThereBeDanger(playerIsWhite, legacyBoard, i, e)
+            (e) => !willThereBeDanger(playerIsWhite, board, i, e)
           ),
           allies
         ),
       });
     }
     if (board[i] === `queen_${playerIsWhite ? "white" : "black"}`) {
-      newBoard.push({
-        piece: board[i],
+      pieceMoves.push({
+        name: board[i],
         pos: i,
         moves: noTeamKill(
-          getPlaces(boundMoves(queenMoves(getXY(i), allPieces))),
+          getPlaces(boundMoves(queenMoves(getXY(i), allPieces))).filter(
+            (e) => !willThereBeDanger(playerIsWhite, board, i, e)
+          ),
           allies
         ),
       });
     }
     if (board[i] === `king_${playerIsWhite ? "white" : "black"}`) {
-      newBoard.push({
-        piece: board[i],
+      pieceMoves.push({
+        name: board[i],
         pos: i,
         moves: noTeamKill(
-          getPlaces(boundMoves(kingMoves(getXY(i), dangerSquares))),
+          getPlaces(
+            boundMoves(
+              kingMoves(
+                getXY(i),
+                dangerSquares,
+                castle,
+                leftLineIsEmpty,
+                rightLineIsEmpty,
+                dangerL,
+                dangerR,
+                check
+              )
+            )
+          ).filter((e) => !willThereBeDanger(playerIsWhite, board, i, e)),
           allies
         ),
       });
     }
     if (board[i] === `pawn_${playerIsWhite ? "white" : "black"}`) {
-      newBoard.push({
-        piece: board[i],
+      pieceMoves.push({
+        name: board[i],
         pos: i,
         moves: noTeamKill(
           getPlaces(
-            boundMoves(pawnMoves(getXY(i), playerIsWhite, whites, blacks))
-          ).filter((e) => !willThereBeDanger(playerIsWhite, legacyBoard, i, e)),
+            boundMoves(
+              pawnMoves(
+                getXY(i),
+                playerIsWhite,
+                whites,
+                blacks,
+                special.jumpPawn
+              )
+            )
+          ).filter((e) => !willThereBeDanger(playerIsWhite, board, i, e)),
           allies
         ),
       });
     }
   }
-  const check = dangerSquares.includes(
-    newBoard.filter(
-      (e) => e.piece === `king_${playerIsWhite ? "white" : "black"}`
-    )[0].pos
-  );
+
   function areThereMoves2play() {
-    for (let i = 0; i < newBoard.length; i++) {
-      if (newBoard[i].moves.length > 0) {
+    for (let i = 0; i < pieceMoves.length; i++) {
+      if (pieceMoves[i].moves.length > 0) {
         return true;
       }
     }
@@ -488,7 +567,164 @@ export function playerInfo(playerIsWhite: boolean, board: string[]) {
     playerIsWhite: playerIsWhite,
     check: check,
     canPlay: areThereMoves2play(),
-    pieceMoves: newBoard,
+    pieceMoves: pieceMoves,
     board: board,
+    ennemyPos: playerIsWhite ? blacks : whites,
+    whiteCastle: special.whiteCastle,
+    blackCastle: special.blackCastle,
+    jumpPawn: special.jumpPawn,
   };
+}
+export function makeAmove(
+  pos1: number,
+  pos2: number,
+  info: gameInfo,
+  requestedPiece: string | null
+): gameInfo {
+  let specialMoveDone = false;
+  const playerColor = info.playerIsWhite ? "white" : "black";
+  const castleL = info.playerIsWhite ? 58 : 2;
+  const castleR = info.playerIsWhite ? 62 : 6;
+  const validPromotePieces = ["rook", "queen", "knight", "bishop"];
+  const promoteLine = info.playerIsWhite
+    ? [0, 1, 2, 3, 4, 5, 6, 7]
+    : [56, 57, 58, 59, 60, 61, 63, 63];
+  const movedPiece = info.pieceMoves.find((e) => e.pos === pos1);
+  //Copies
+  let { board } = info;
+  let jumpPawn = info.jumpPawn;
+  let whiteCastle = { ...info.whiteCastle };
+  let blackCastle = { ...info.blackCastle };
+  //Basic error handeling
+  if (!movedPiece) {
+    console.error("no piece found");
+
+    return info;
+  }
+  if (!movedPiece.moves.includes(pos2)) {
+    console.error("this piece cannot move here");
+    return info;
+  }
+  //Handle special Logic here
+
+  //En passant trigger
+  if (
+    movedPiece.name === `pawn_${playerColor}` &&
+    Math.abs(getY(pos1) - getY(pos2)) === 2
+  ) {
+    jumpPawn = pos2;
+  } else {
+    jumpPawn = null;
+  }
+  //Possibility for castle update
+
+  //Checking king
+  if (movedPiece.name === `king_${playerColor}`) {
+    if (info.playerIsWhite) {
+      whiteCastle.kingMoved = true;
+    }
+    if (!info.playerIsWhite) {
+      blackCastle.kingMoved = true;
+    }
+  }
+  //Checking left rook
+  if (movedPiece.name === `rook_${playerColor}` && movedPiece.pos === castleL) {
+    if (info.playerIsWhite) {
+      whiteCastle.rookLMoved = true;
+    }
+    if (!info.playerIsWhite) {
+      blackCastle.rookLMoved = true;
+    }
+  }
+  //Checking right rook
+  if (movedPiece.name === `rook_${playerColor}` && movedPiece.pos === castleR) {
+    if (info.playerIsWhite) {
+      whiteCastle.rookRMoved = true;
+    }
+    if (!info.playerIsWhite) {
+      blackCastle.rookRMoved = true;
+    }
+  }
+
+  //En passant move for white
+  if (
+    info.jumpPawn &&
+    movedPiece.name === "pawn_white" &&
+    getY(pos2) === getY(info.jumpPawn) - 1
+  ) {
+    specialMoveDone = true;
+    board[info.jumpPawn] = "";
+    board[pos1] = "";
+    board[pos2] = "pawn_white";
+  }
+  //En passant move for black
+  if (
+    info.jumpPawn &&
+    movedPiece.name === "pawn_black" &&
+    getY(pos2) === getY(info.jumpPawn) + 1
+  ) {
+    specialMoveDone = true;
+    board[info.jumpPawn] = "";
+    board[pos1] = "";
+    board[pos2] = "pawn_black";
+  }
+  //Pawn promote
+  if (movedPiece.name === `pawn_${playerColor}` && promoteLine.includes(pos2)) {
+    if (requestedPiece && validPromotePieces.includes(requestedPiece)) {
+      specialMoveDone = true;
+      board[pos1] = "";
+      board[pos2] = requestedPiece + `_${playerColor}`;
+    } else {
+      console.error(`Incorrect promote piece, got: ${requestedPiece}`);
+      return info;
+    }
+  }
+
+  //Castle left side
+  if (movedPiece.name === `king_${playerColor}` && pos2 === castleL) {
+    specialMoveDone = true;
+    if (info.playerIsWhite) {
+      board[60] = "";
+      board[56] = "";
+      board[59] = "rook_white";
+      board[58] = "king_white";
+    }
+    if (!info.playerIsWhite) {
+      board[4] = "";
+      board[0] = "";
+      board[3] = "rook_black";
+      board[2] = "king_black";
+    }
+  }
+  //Castle right side
+  if (movedPiece.name === `king_${playerColor}` && pos2 === castleR) {
+    specialMoveDone = true;
+    if (info.playerIsWhite) {
+      board[60] = "";
+      board[63] = "";
+      board[61] = "rook_white";
+      board[62] = "king_white";
+    }
+    if (!info.playerIsWhite) {
+      board[4] = "";
+      board[7] = "";
+      board[5] = "rook_black";
+      board[6] = "king_black";
+    }
+  }
+
+  //Normal move
+  if (!specialMoveDone) {
+    board[pos2] = board[pos1];
+    board[pos1] = "";
+  }
+
+  //New Player info
+  const special = {
+    whiteCastle: whiteCastle,
+    blackCastle: blackCastle,
+    jumpPawn: jumpPawn,
+  };
+  const newPlayerInfo = playerInfo(!info.playerIsWhite, board, special);
+  return newPlayerInfo;
 }
