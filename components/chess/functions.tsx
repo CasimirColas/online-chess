@@ -234,16 +234,26 @@ export function kingMoves(
     { x: coord.x - 1, y: coord.y - 1 },
     { x: coord.x + 1, y: coord.y - 1 },
     { x: coord.x - 1, y: coord.y + 1 },
-  ];
+  ].filter((e) => !blocks.some((f) => f.x === e.x && f.y === e.y));
   if (!castle.kingMoved && !check) {
-    if (!castle.rookLMoved && leftLineIsEmpty && !dangerL) {
+    if (
+      !castle.rookLMoved &&
+      leftLineIsEmpty &&
+      !dangerL &&
+      moves.some((e) => e.x === coord.x - 1 && e.y === coord.y)
+    ) {
       moves.push({ x: coord.x - 2, y: coord.y });
     }
-    if (!castle.rookRMoved && rightLineIsEmpty && !dangerR) {
+    if (
+      !castle.rookRMoved &&
+      rightLineIsEmpty &&
+      !dangerR &&
+      moves.some((e) => e.x === coord.x + 1 && e.y === coord.y)
+    ) {
       moves.push({ x: coord.x + 2, y: coord.y });
     }
   }
-  return moves.filter((e) => !blocks.some((f) => f.x === e.x && f.y === e.y));
+  return moves;
 }
 export function pawnMoves(
   coord: { x: number; y: number },
@@ -585,6 +595,8 @@ export function makeAmove(
   const playerColor = info.playerIsWhite ? "white" : "black";
   const castleL = info.playerIsWhite ? 58 : 2;
   const castleR = info.playerIsWhite ? 62 : 6;
+  const castleLennemy = info.playerIsWhite ? 2 : 58;
+  const castleRennemy = info.playerIsWhite ? 6 : 62;
   const validPromotePieces = ["rook", "queen", "knight", "bishop"];
   const promoteLine = info.playerIsWhite
     ? [0, 1, 2, 3, 4, 5, 6, 7]
@@ -636,6 +648,15 @@ export function makeAmove(
       blackCastle.rookLMoved = true;
     }
   }
+  //Left rook has been eaten
+  if (pos2 === castleLennemy - 1) {
+    if (!info.playerIsWhite) {
+      whiteCastle.rookLMoved = true;
+    }
+    if (info.playerIsWhite) {
+      blackCastle.rookLMoved = true;
+    }
+  }
   //Checking right rook
   if (movedPiece.name === `rook_${playerColor}` && movedPiece.pos === castleR) {
     if (info.playerIsWhite) {
@@ -645,7 +666,15 @@ export function makeAmove(
       blackCastle.rookRMoved = true;
     }
   }
-
+  //Right rook has been eaten
+  if (pos2 === castleRennemy + 1) {
+    if (!info.playerIsWhite) {
+      whiteCastle.rookRMoved = true;
+    }
+    if (info.playerIsWhite) {
+      blackCastle.rookRMoved = true;
+    }
+  }
   //En passant move for white
   if (
     info.jumpPawn &&

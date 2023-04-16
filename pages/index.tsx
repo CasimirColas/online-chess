@@ -17,7 +17,18 @@ export default function Home() {
     moveSound.play();
   }
   const [game, setGame] = useState<gameInfo>(
-    playerInfo(true, initialBoard, defaultSpecial)
+    playerInfo(
+      false,
+      createCustomBoard([
+        { p: "king_white", pos: 60 },
+        { p: "king_black", pos: 12 },
+        { p: "rook_white", pos: 56 },
+        { p: "rook_white", pos: 63 },
+        { p: "knight_black", pos: 46 },
+        { p: "rook_white", pos: 7 },
+      ]),
+      defaultSpecial
+    )
     // createCustomBoard([
     //   { p: "king_white", pos: 60 },
     //   { p: "king_black", pos: 42 },
@@ -25,7 +36,7 @@ export default function Home() {
     //   { p: "rook_black", pos: 47 },
     // ])
   );
-  const [wishedPiece, setwishedPiece] = useState("queen");
+  const [wishedPiece, setwishedPiece] = useState("rook");
   const [turnCounter, setTurnCounter] = useState(0);
 
   function movePice(pos1: number, pos2: number) {
