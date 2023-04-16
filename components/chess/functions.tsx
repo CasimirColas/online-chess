@@ -607,6 +607,7 @@ export function makeAmove(
   let jumpPawn = info.jumpPawn;
   let whiteCastle = { ...info.whiteCastle };
   let blackCastle = { ...info.blackCastle };
+  const myCastle = info.playerIsWhite ? whiteCastle : blackCastle;
   //Basic error handeling
   if (!movedPiece) {
     console.error("no piece found");
@@ -630,22 +631,39 @@ export function makeAmove(
   }
   //Possibility for castle update
 
-  //Checking king
-  if (movedPiece.name === `king_${playerColor}`) {
-    if (info.playerIsWhite) {
-      whiteCastle.kingMoved = true;
+  if (!myCastle.kingMoved) {
+    //Checking king
+    if (movedPiece.name === `king_${playerColor}`) {
+      if (info.playerIsWhite) {
+        whiteCastle.kingMoved = true;
+      }
+      if (!info.playerIsWhite) {
+        blackCastle.kingMoved = true;
+      }
     }
-    if (!info.playerIsWhite) {
-      blackCastle.kingMoved = true;
+    //Checking left rook
+    if (
+      movedPiece.name === `rook_${playerColor}` &&
+      movedPiece.pos === castleL
+    ) {
+      if (info.playerIsWhite) {
+        whiteCastle.rookLMoved = true;
+      }
+      if (!info.playerIsWhite) {
+        blackCastle.rookLMoved = true;
+      }
     }
-  }
-  //Checking left rook
-  if (movedPiece.name === `rook_${playerColor}` && movedPiece.pos === castleL) {
-    if (info.playerIsWhite) {
-      whiteCastle.rookLMoved = true;
-    }
-    if (!info.playerIsWhite) {
-      blackCastle.rookLMoved = true;
+    //Checking right rook
+    if (
+      movedPiece.name === `rook_${playerColor}` &&
+      movedPiece.pos === castleR
+    ) {
+      if (info.playerIsWhite) {
+        whiteCastle.rookRMoved = true;
+      }
+      if (!info.playerIsWhite) {
+        blackCastle.rookRMoved = true;
+      }
     }
   }
   //Left rook has been eaten
@@ -655,15 +673,6 @@ export function makeAmove(
     }
     if (info.playerIsWhite) {
       blackCastle.rookLMoved = true;
-    }
-  }
-  //Checking right rook
-  if (movedPiece.name === `rook_${playerColor}` && movedPiece.pos === castleR) {
-    if (info.playerIsWhite) {
-      whiteCastle.rookRMoved = true;
-    }
-    if (!info.playerIsWhite) {
-      blackCastle.rookRMoved = true;
     }
   }
   //Right rook has been eaten

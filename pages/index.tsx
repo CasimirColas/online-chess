@@ -18,13 +18,13 @@ export default function Home() {
   }
   const [game, setGame] = useState<gameInfo>(
     playerInfo(
-      false,
+      true,
       createCustomBoard([
         { p: "king_white", pos: 60 },
         { p: "king_black", pos: 12 },
         { p: "rook_white", pos: 56 },
         { p: "rook_white", pos: 63 },
-        { p: "knight_black", pos: 46 },
+        { p: "rook_black", pos: 44 },
         { p: "rook_white", pos: 7 },
       ]),
       defaultSpecial
